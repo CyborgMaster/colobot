@@ -520,6 +520,100 @@ bool CScriptFunctions::rFactory(CBotVar* thisclass, CBotVar* var, CBotVar* resul
     return true;
 }
 
+// Compilation of instruction "object.loadProgram(slot, path)"
+
+CBotTypResult CScriptFunctions::cLoadProgram(CBotVar* thisclass, CBot::CBotVar* &var)
+{
+    if ( var == nullptr )  return CBotTypResult(CBotErrLowParam);
+    if ( var->GetType() > CBotTypDouble )  return CBotTypResult(CBotErrBadNum);
+    var = var->GetNext();
+    if ( var == nullptr )  return CBotTypResult(CBotErrLowParam);
+    if ( var->GetType() != CBotTypString )  return CBotTypResult(CBotErrBadString);
+    var = var->GetNext();
+    if ( var != nullptr )  return CBotTypResult(CBotErrOverParam);
+
+    return CBotTypResult(CBotTypFloat);
+}
+
+// Instruction "object.loadProgram(slot, path)"
+
+bool CScriptFunctions::rLoadProgram(CBotVar* thisclass, CBotVar* var, CBotVar* result, int& exception, void* user)
+{
+    CScript*    script = static_cast<CScript*>(user);
+    CObject*    pThis = script->m_object;
+
+    std::string  scriptName;
+    int          slot;
+
+    exception = 0;
+
+    slot = var->GetValInt() - 1; //internally 0 based, program list is 1 based on screen
+    var = var->GetNext();
+
+    //make sure the chosen slot is in range
+    if (slot < 0 || slot > 9) {
+        result->SetValInt(ERR_UNKNOWN);
+        return false;
+    }
+
+    scriptName = var->GetValString();
+
+    CObject* bot = static_cast<CObject*>(thisclass->GetUserPtr());
+    if (bot == nullptr)
+    {
+        exception = ERR_UNKNOWN;
+        result->SetValInt(ERR_UNKNOWN);
+        GetLogger()->Error("in object.loadProgram() - bot is nullptr");
+        return false;
+    }
+
+    if ( pThis->GetTeam() != bot->GetTeam() && bot->GetTeam() != 0 )
+    {
+        exception = ERR_ENEMY_OBJECT;
+        result->SetValInt(ERR_ENEMY_OBJECT);
+        return false;
+    }
+
+    if (!bot->Implements(ObjectInterfaceType::Programmable) ||
+        !bot->Implements(ObjectInterfaceType::ProgramStorage))
+    {
+        exception = ERR_WRONG_OBJ;
+        result->SetValInt(ERR_WRONG_OBJ);
+        return false;
+    }
+
+    CProgramStorageObject* programStore = dynamic_cast<CProgramStorageObject*>(bot);
+    CProgrammableObject* programmable = dynamic_cast<CProgrammableObject*>(bot);
+
+    // Make sure we're not trying to replace the running script
+    if (programStore->GetProgramIndex(programmable->GetCurrentProgram()) == slot)
+    {
+        GetLogger()->Error("Program running");
+        exception = ERR_UNKNOWN;
+        result->SetValInt(ERR_UNKNOWN);
+        return false;
+    }
+
+    Program* program = programStore->GetOrAddProgram(slot);
+    if (!programStore->ReadProgram(program, scriptName.c_str())) {
+        exception = ERR_UNKNOWN; // couldn't load script
+        result->SetValInt(ERR_UNKNOWN);
+        return false;
+    }
+
+    // Check for correct compilation
+    if (!programStore->GetCompile(program)) {
+        exception = ERR_UNKNOWN; // couldn't load script
+        result->SetValInt(ERR_UNKNOWN);
+        return false;
+    }
+
+    CApplication::GetInstancePointer()->GetEventQueue()->AddEvent(Event(EVENT_UPDINTERFACE));
+
+    result->SetValInt(ERR_OK);
+    return true;
+}
+
 // Instruction "object.research(type)"
 
 bool CScriptFunctions::rResearch(CBotVar* thisclass, CBotVar* var, CBotVar* result, int& exception, void* user)
@@ -3203,6 +3297,8 @@ void CScriptFunctions::Init()
     bc->AddFunction("research", rResearch, cClassOneFloat);
     bc->AddFunction("takeoff",  rTakeOff,  cClassNull);
     bc->AddFunction("destroy",  rDestroy,  cClassNull);
+
+    bc->AddFunction("loadProgram", rLoadProgram, cLoadProgram);
 
     CBotProgram::AddFunction("endmission",rEndMission,cEndMission);
     CBotProgram::AddFunction("playmusic", rPlayMusic ,cPlayMusic);
