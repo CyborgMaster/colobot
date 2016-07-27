@@ -79,6 +79,11 @@ CBotTypResult CScriptFunctions::cClassOneFloat(CBotVar* thisclass, CBotVar* &var
     return cOneFloat(var, nullptr);
 }
 
+CBotTypResult CScriptFunctions::cClassOneInt(CBotVar* thisclass, CBotVar* &var)
+{
+    return cOneInt(var, nullptr);
+}
+
 // Compiling a procedure with a "dot".
 
 CBotTypResult CScriptFunctions::cPoint(CBotVar* &var, void* user)
@@ -595,14 +600,16 @@ bool CScriptFunctions::rLoadProgram(CBotVar* thisclass, CBotVar* var, CBotVar* r
     }
 
     Program* program = programStore->GetOrAddProgram(slot);
-    if (!programStore->ReadProgram(program, scriptName.c_str())) {
+    if (!programStore->ReadProgram(program, scriptName.c_str()))
+    {
         exception = ERR_UNKNOWN; // couldn't load script
         result->SetValInt(ERR_UNKNOWN);
         return false;
     }
 
     // Check for correct compilation
-    if (!programStore->GetCompile(program)) {
+    if (!programStore->GetCompile(program))
+    {
         exception = ERR_UNKNOWN; // couldn't load script
         result->SetValInt(ERR_UNKNOWN);
         return false;
@@ -612,6 +619,76 @@ bool CScriptFunctions::rLoadProgram(CBotVar* thisclass, CBotVar* var, CBotVar* r
 
     result->SetValInt(ERR_OK);
     return true;
+}
+
+// Instruction "object.runProgram(slot)"
+
+bool CScriptFunctions::rRunProgram(CBotVar* thisclass, CBotVar* var, CBotVar* result, int& exception, void* user)
+{
+    CScript*    script = static_cast<CScript*>(user);
+    CObject*    pThis = script->m_object;
+    int         slot;
+
+    exception = 0;
+
+    slot = var->GetValInt() - 1; //internally 0 based, program list is 1 based on screen
+
+    //make sure the chosen slot is in range
+    if (slot < 0 || slot > 9) {
+        result->SetValInt(ERR_UNKNOWN);
+        return false;
+    }
+
+    CObject* bot = static_cast<CObject*>(thisclass->GetUserPtr());
+    if (bot == nullptr)
+    {
+        exception = ERR_UNKNOWN;
+        result->SetValInt(ERR_UNKNOWN);
+        GetLogger()->Error("in object.runProgram() - bot is nullptr");
+        return false;
+    }
+
+    if ( pThis->GetTeam() != bot->GetTeam() && bot->GetTeam() != 0 )
+    {
+        exception = ERR_ENEMY_OBJECT;
+        result->SetValInt(ERR_ENEMY_OBJECT);
+        return false;
+    }
+
+    if (!bot->Implements(ObjectInterfaceType::Programmable) ||
+        !bot->Implements(ObjectInterfaceType::ProgramStorage))
+    {
+        exception = ERR_WRONG_OBJ;
+        result->SetValInt(ERR_WRONG_OBJ);
+        return false;
+    }
+
+    CProgramStorageObject* programStore = dynamic_cast<CProgramStorageObject*>(bot);
+    CProgrammableObject* programmable = dynamic_cast<CProgrammableObject*>(bot);
+
+    Program* program = programStore->GetProgram(slot);
+
+    // Check for correct compilation
+    if (!programStore->GetCompile(program))
+    {
+        exception = ERR_UNKNOWN;
+        result->SetValInt(ERR_UNKNOWN);
+        return false;
+    }
+
+    // Stop currently running program if there is one
+    if (programmable->IsProgram()) programmable->StopProgram();
+    programmable->RunProgram(program);
+
+    //CApplication::GetInstancePointer()->GetEventQueue()->AddEvent(Event(EVENT_UPDINTERFACE));
+
+    result->SetValInt(ERR_OK);
+
+    // If this is the program from the current bot, then we've started a new
+    // one, so we should stop processing commands in this program (return false).
+    // If we've started a program on another bot, then we can continue the
+    // current one (return true).
+    return bot != pThis;
 }
 
 // Instruction "object.research(type)"
@@ -3299,6 +3376,7 @@ void CScriptFunctions::Init()
     bc->AddFunction("destroy",  rDestroy,  cClassNull);
 
     bc->AddFunction("loadProgram", rLoadProgram, cLoadProgram);
+    bc->AddFunction("runProgram", rRunProgram, cClassOneInt);
 
     CBotProgram::AddFunction("endmission",rEndMission,cEndMission);
     CBotProgram::AddFunction("playmusic", rPlayMusic ,cPlayMusic);

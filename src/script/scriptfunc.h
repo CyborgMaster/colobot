@@ -148,6 +148,7 @@ private:
     static CBot::CBotTypResult cFactory(CBot::CBotVar* thisclass, CBot::CBotVar* &var);
     static CBot::CBotTypResult cClassNull(CBot::CBotVar* thisclass, CBot::CBotVar* &var);
     static CBot::CBotTypResult cClassOneFloat(CBot::CBotVar* thisclass, CBot::CBotVar* &var);
+    static CBot::CBotTypResult cClassOneInt(CBot::CBotVar* thisclass, CBot::CBotVar* &var);
     static CBot::CBotTypResult cLoadProgram(CBot::CBotVar* thisclass, CBot::CBotVar* &var);
 
     static bool rBusy(CBot::CBotVar* thisclass, CBot::CBotVar* var, CBot::CBotVar* result, int& exception, void* user);
@@ -156,6 +157,7 @@ private:
     static bool rTakeOff(CBot::CBotVar* thisclass, CBot::CBotVar* var, CBot::CBotVar* result, int& exception, void* user);
     static bool rDestroy(CBot::CBotVar* thisclass, CBot::CBotVar* var, CBot::CBotVar* result, int& exception, void* user);
     static bool rLoadProgram(CBot::CBotVar* thisclass, CBot::CBotVar* var, CBot::CBotVar* result, int& exception, void* user);
+    static bool rRunProgram(CBot::CBotVar* thisclass, CBot::CBotVar* var, CBot::CBotVar* result, int& exception, void* user);
 
     static CBot::CBotTypResult cPointConstructor(CBot::CBotVar* pThis, CBot::CBotVar* &var);
     static bool rPointConstructor(CBot::CBotVar* pThis, CBot::CBotVar* var, CBot::CBotVar* pResult, int& Exception, void* user);
