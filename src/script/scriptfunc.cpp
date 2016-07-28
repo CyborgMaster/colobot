@@ -690,13 +690,15 @@ bool CScriptFunctions::rDelete(CBotVar* var, CBotVar* result, int& exception, vo
 
 
 
-// Compilation of the instruction "search(type, pos)".
+// Compilation of the instruction "search(type, pos, min)".
 
 CBotTypResult CScriptFunctions::cSearch(CBotVar* &var, void* user)
 {
     CBotVar*        array;
+    CBotTypResult   returnValue;
     CBotTypResult   ret;
 
+    returnValue = CBotTypResult(CBotTypPointer, "object");
     if ( var == nullptr )  return CBotTypResult(CBotErrLowParam);
     if ( var->GetType() == CBotTypArrayPointer )
     {
@@ -706,17 +708,17 @@ CBotTypResult CScriptFunctions::cSearch(CBotVar* &var, void* user)
     }
     else if ( var->GetType() > CBotTypDouble )  return CBotTypResult(CBotErrBadNum);
     var = var->GetNext();
-    if ( var != nullptr )
-    {
-        ret = cPoint(var, user);
-        if ( ret.GetType() != 0 )  return ret;
-        if ( var != nullptr )  return CBotTypResult(CBotErrOverParam);
-    }
-
-    return CBotTypResult(CBotTypPointer, "object");
+    if ( var == nullptr ) return returnValue;
+    ret = cPoint(var, user);
+    if ( ret.GetType() != 0 )  return ret;
+    if ( var == nullptr ) return returnValue;
+    if ( var->GetType() > CBotTypDouble )  return CBotTypResult(CBotErrBadNum);  // min
+    var = var->GetNext();
+    if ( var == nullptr ) return returnValue;
+    return CBotTypResult(CBotErrOverParam);
 }
 
-// Instruction "search(type, pos)".
+// Instruction "search(type, pos, min)".
 
 bool CScriptFunctions::rSearch(CBotVar* var, CBotVar* result, int& exception, void* user)
 {
@@ -726,6 +728,7 @@ bool CScriptFunctions::rSearch(CBotVar* var, CBotVar* result, int& exception, vo
     Math::Vector    pos, oPos;
     bool        bArray;
     int         type;
+    float       minDist = 0;
 
     if ( var->GetType() == CBotTypArrayPointer )
     {
@@ -741,6 +744,10 @@ bool CScriptFunctions::rSearch(CBotVar* var, CBotVar* result, int& exception, vo
     if ( var != nullptr )
     {
         if ( !GetPoint(var, exception, pos) )  return true;
+        if ( var != nullptr )
+        {
+            minDist = var->GetValFloat();
+        }
     }
     else
     {
@@ -764,7 +771,7 @@ bool CScriptFunctions::rSearch(CBotVar* var, CBotVar* result, int& exception, vo
         }
     }
 
-    pBest = CObjectManager::GetInstancePointer()->Radar(pThis, pos, 0.0f, type_v, 0.0f, Math::PI*2.0f, 0.0f, 1000.0f, false, FILTER_NONE, true);
+    pBest = CObjectManager::GetInstancePointer()->Radar(pThis, pos, 0.0f, type_v, 0.0f, Math::PI*2.0f, minDist, 1000.0f, false, FILTER_NONE, true);
 
     if ( pBest == nullptr )
     {
